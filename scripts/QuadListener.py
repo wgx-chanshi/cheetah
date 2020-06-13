@@ -25,8 +25,9 @@ def init_simulation():
     quadruped = p.loadURDF("mini_cheetah/mini_cheetah.urdf", init_position, useFixedBase=False)
     num_joints = p.getNumJoints(quadruped)
     compensate = [-1, 1, 1, 1, 1, 1, -1, -1, -1, 1, -1, -1, 1, 1, 1, 1]
-    init_pos = [-1, -0.8, 1.75, 1, -0.8, 1.75, 1, 0.8, -1.75, -1, 0.8, -1.75, 0, 0, 0, 0]
+    #init_pos = [-1, -0.8, 1.75, 1, -0.8, 1.75, 1, 0.8, -1.75, -1, 0.8, -1.75, 0, 0, 0, 0]
     # init_pos = [0, -0.8, 1.75, 0, -0.8, 1.75, 0, 0.8, -1.75, -0, 0.8, -1.75, 0, 0, 0, 0]
+    init_pos = [-0.2, -1.1, 2.8, 0.2, -1.1, 2.8, 0.2, 1.1, -2.8, -0.2, 1.1, -2.8, 0, 0, 0, 0]
     init_force = [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200]
     # init_force = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     init_new_pos = []
@@ -97,7 +98,7 @@ def callback_state(msg):
     get_position = []
     get_velocity = []
     get_effort = []
-    compensate = [1, 1, 1, 1, 1, 1, 1, -1, 1, 1, -1, -1]
+    compensate = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     if mode == p.TORQUE_CONTROL:
         for i in range(12):
             get_effort.append(compensate[i] * msg.effort[i])
@@ -140,7 +141,7 @@ def talker():
     pub1 = rospy.Publisher('/imu_body', Imu, queue_size=10)
     pub2 = rospy.Publisher('/get_js', JointState, queue_size=10)
     # rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(50)  # hz
+    rate = rospy.Rate(200)  # hz
     imu_msg = Imu()
     joint_msg = JointState()
     joint_msg.header = Header()
