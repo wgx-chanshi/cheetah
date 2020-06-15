@@ -40,10 +40,10 @@ def init_simulation():
     #                             controlMode=p.POSITION_CONTROL,
     #                             targetPositions=init_new_pos,
     #                             forces=init_new_force)
-    for j in range(num_joints):
+    for j in range(16):
         print(num_joints)
         p.changeVisualShape(quadruped, j, rgbaColor=[1, 1, 1, 1])
-        force = 100
+        force = 500
         pos = 0
         # p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force)
         p.setJointMotorControl2(quadruped, all_motor_id_list[j], p.POSITION_CONTROL, init_new_pos[j], force=force)
@@ -67,10 +67,14 @@ def set_pos(set_mode, position_list=[]):
 
 
 def set_force(set_mode, force_list=[]):
+    pos_gain = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
+    vel_gain = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100]
     p.setJointMotorControlArray(quadruped,
                                 jointIndices=motor_id_list,
                                 controlMode=set_mode,
-                                forces=force_list)
+                                forces=force_list,
+                                positionGains=pos_gain,
+                                velocityGains=vel_gain)
 
 
 def set_vel(set_mode, vel_list=[]):
@@ -125,7 +129,8 @@ def callback_mode(req):
         mode = p.TORQUE_CONTROL
         for j in range(16):
             force = 0
-            p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force)
+            p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force, positionGain=10, velocityGain=10)
+            p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
     elif req.cmd == 1:
         mode = p.POSITION_CONTROL
     elif req.cmd == 4:
@@ -153,9 +158,9 @@ def talker():
         imu_msg.orientation.y = poseandorn[1][1]
         imu_msg.orientation.z = poseandorn[1][2]
         imu_msg.orientation.w = poseandorn[1][3]
-        imu_msg.linear_acceleration.x = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / 500
-        imu_msg.linear_acceleration.y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / 500
-        imu_msg.linear_acceleration.z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / 500 - 9.8
+        imu_msg.linear_acceleration.x = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / 200
+        imu_msg.linear_acceleration.y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / 200
+        imu_msg.linear_acceleration.z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / 200 + 9.8
         imu_msg.angular_velocity.x = linearandangular_vel2[1][0]
         imu_msg.angular_velocity.y = linearandangular_vel2[1][1]
         imu_msg.angular_velocity.z = linearandangular_vel2[1][2]
