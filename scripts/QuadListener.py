@@ -102,7 +102,7 @@ def callback_state(msg):
     get_position = []
     get_velocity = []
     get_effort = []
-    compensate = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    compensate = [-1, 1, 1, 1, 1, 1, -1, -1, -1, 1, -1, -1]
     if mode == p.TORQUE_CONTROL:
         for i in range(12):
             get_effort.append(compensate[i] * msg.effort[i])
@@ -130,7 +130,8 @@ def callback_mode(req):
         for j in range(16):
             force = 0
             p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force, positionGain=10, velocityGain=10)
-            p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
+            #p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
+            p.changeDynamics(quadruped, j, jointDamping=0.5)
     elif req.cmd == 1:
         mode = p.POSITION_CONTROL
     elif req.cmd == 4:
@@ -146,11 +147,12 @@ def talker():
     pub1 = rospy.Publisher('/imu_body', Imu, queue_size=10)
     pub2 = rospy.Publisher('/get_js', JointState, queue_size=10)
     # rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(200)  # hz
+    rate = rospy.Rate(500)  # hz
     imu_msg = Imu()
     joint_msg = JointState()
     joint_msg.header = Header()
     linearandangular_vel1 = get_vel()
+    cnt = 0
     while not rospy.is_shutdown():
         poseandorn = get_pose_orn()
         linearandangular_vel2 = get_vel()
@@ -184,8 +186,10 @@ def talker():
                               joint_state[3][1], joint_state[4][1], joint_state[5][1],
                               -joint_state[6][1], -joint_state[7][1], -joint_state[8][1],
                               joint_state[9][1], -joint_state[10][1], -joint_state[11][1]]
-        pub1.publish(imu_msg)
-        pub2.publish(joint_msg)
+        if cnt%1==0:
+            pub1.publish(imu_msg)
+            pub2.publish(joint_msg)
+        cnt = cnt +1
 
         myjoint_sate = p.getJointStates(quadruped, motor_list)
         # for j in range(12):
