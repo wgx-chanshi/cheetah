@@ -19,6 +19,7 @@ def init_simulation():
     motor_id_list = [4, 5, 6, 12, 13, 14, 0, 1, 2, 8, 9, 10]
     all_motor_id_list = [4, 5, 6, 12, 13, 14, 0, 1, 2, 8, 9, 10, 3, 7, 11, 15]
     p.setGravity(0, 0, -9.8)
+    # p.setPhysicsEngineParameter(fixedTimeStep=1.0 / 10., numSolverIterations=550, numSubSteps=4)
     p.resetDebugVisualizerCamera(0.2, 45, -30, [1, -1, 1])
     planeId = p.loadURDF("plane.urdf")
     init_position = [0, 0, 0.5]
@@ -48,6 +49,7 @@ def init_simulation():
         # p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force)
         p.setJointMotorControl2(quadruped, all_motor_id_list[j], p.POSITION_CONTROL, init_new_pos[j], force=force)
         p.enableJointForceTorqueSensor(quadruped, j, 1)
+
 
 
 
@@ -102,7 +104,7 @@ def callback_state(msg):
     get_position = []
     get_velocity = []
     get_effort = []
-    compensate = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    compensate = [-1, 1, 1, 1, 1, 1, -1, -1, -1, 1, -1, -1]
     if mode == p.TORQUE_CONTROL:
         for i in range(12):
             get_effort.append(compensate[i] * msg.effort[i])
@@ -130,7 +132,8 @@ def callback_mode(req):
         for j in range(16):
             force = 0
             p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force, positionGain=10, velocityGain=10)
-            p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
+            # p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
+            p.changeDynamics(quadruped, j, jointDamping=0.5)
     elif req.cmd == 1:
         mode = p.POSITION_CONTROL
     elif req.cmd == 4:
@@ -143,29 +146,42 @@ def talker():
     print("send the IMU messages")
     motor_list = [4, 5, 6, 12, 13, 14, 0, 1, 2, 8, 9, 10, 3, 7, 11, 15]
     compensate = [-1, 1, 1, 1, 1, 1, -1, -1, -1, 1, -1, -1]
+    matrix = []
     pub1 = rospy.Publisher('/imu_body', Imu, queue_size=10)
     pub2 = rospy.Publisher('/get_js', JointState, queue_size=10)
     # rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(200)  # hz
+    freq = 1000
+    rate = rospy.Rate(freq)  # hz
     imu_msg = Imu()
     joint_msg = JointState()
     joint_msg.header = Header()
     linearandangular_vel1 = get_vel()
+    count = 0
     while not rospy.is_shutdown():
+        quaternion = []
         poseandorn = get_pose_orn()
         linearandangular_vel2 = get_vel()
+        for i in range(4):
+            quaternion.append(poseandorn[1][i])
+        matrix = p.getMatrixFromQuaternion(quaternion)
         imu_msg.orientation.x = poseandorn[1][0]
         imu_msg.orientation.y = poseandorn[1][1]
         imu_msg.orientation.z = poseandorn[1][2]
         imu_msg.orientation.w = poseandorn[1][3]
-        imu_msg.linear_acceleration.x = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / 200
-        imu_msg.linear_acceleration.y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / 200
-        imu_msg.linear_acceleration.z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / 200 + 9.8
+        # imu_msg.linear_acceleration.x = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / freq
+        # imu_msg.linear_acceleration.y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / freq
+        # imu_msg.linear_acceleration.z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / freq + 9.8
+        acc_X = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / freq
+        acc_Y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / freq
+        acc_Z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / freq + 9.8
+        imu_msg.linear_acceleration.x = matrix[0] * acc_X + matrix[1] * acc_Y + matrix[2] * acc_Z
+        imu_msg.linear_acceleration.y = matrix[3] * acc_X + matrix[4] * acc_Y + matrix[5] * acc_Z
+        imu_msg.linear_acceleration.z = matrix[6] * acc_X + matrix[7] * acc_Y + matrix[8] * acc_Z
         imu_msg.angular_velocity.x = linearandangular_vel2[1][0]
         imu_msg.angular_velocity.y = linearandangular_vel2[1][1]
         imu_msg.angular_velocity.z = linearandangular_vel2[1][2]
         linearandangular_vel1 = linearandangular_vel2
-        # print(imu_msg)
+        print(imu_msg)
 
         joint_msg.header.stamp = rospy.Time.now()
         joint_msg.name = ["abduct_fl", "thigh_fl", "knee_fl", "abduct_hl", "thigh_hl", "knee_hl",
@@ -184,17 +200,19 @@ def talker():
                               joint_state[3][1], joint_state[4][1], joint_state[5][1],
                               -joint_state[6][1], -joint_state[7][1], -joint_state[8][1],
                               joint_state[9][1], -joint_state[10][1], -joint_state[11][1]]
-        pub1.publish(imu_msg)
-        pub2.publish(joint_msg)
+        if count % 2 == 0:
+            pub1.publish(imu_msg)
+            pub2.publish(joint_msg)
+        count = count + 1
 
         myjoint_sate = p.getJointStates(quadruped, motor_list)
         # for j in range(12):
         #     # print("get the", j, " ",  myjoint_sate[j][2][3] * compensate[j], " ", myjoint_sate[j][2][4] * compensate[j])
         #     print("get the", j, " ", myjoint_sate[j][3] * compensate[j])
-        print("get the 3", myjoint_sate[12][2][2])
-        print("get the 7", myjoint_sate[13][2][2])
-        print("get the 11", myjoint_sate[14][2][2])
-        print("get the 15", myjoint_sate[15][2][2])
+        # print("get the 3", myjoint_sate[12][2][2])
+        # print("get the 7", myjoint_sate[13][2][2])
+        # print("get the 11", myjoint_sate[14][2][2])
+        # print("get the 15", myjoint_sate[15][2][2])
         # print(myjoint_sate)
         p.stepSimulation()
         # rospy.spin()
