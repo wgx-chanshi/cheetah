@@ -132,7 +132,7 @@ def callback_mode(req):
         for j in range(16):
             force = 0
             p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force, positionGain=10, velocityGain=10)
-            # p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
+            #p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
             p.changeDynamics(quadruped, j, jointDamping=0.5)
     elif req.cmd == 1:
         mode = p.POSITION_CONTROL
