@@ -26,7 +26,7 @@ def init_simulation():
     quadruped = p.loadURDF("mini_cheetah/mini_cheetah.urdf", init_position, useFixedBase=False)
     num_joints = p.getNumJoints(quadruped)
     compensate = [-1, 1, 1, 1, 1, 1, -1, -1, -1, 1, -1, -1, 1, 1, 1, 1]
-    #init_pos = [-1, -0.8, 1.75, 1, -0.8, 1.75, 1, 0.8, -1.75, -1, 0.8, -1.75, 0, 0, 0, 0]
+    # init_pos = [-1, -0.8, 1.75, 1, -0.8, 1.75, 1, 0.8, -1.75, -1, 0.8, -1.75, 0, 0, 0, 0]
     # init_pos = [0, -0.8, 1.75, 0, -0.8, 1.75, 0, 0.8, -1.75, -0, 0.8, -1.75, 0, 0, 0, 0]
     init_pos = [-0.2, -1.1, 2.8, 0.2, -1.1, 2.8, 0.2, 1.1, -2.8, -0.2, 1.1, -2.8, 0, 0, 0, 0]
     init_force = [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200]
@@ -51,12 +51,14 @@ def init_simulation():
         p.enableJointForceTorqueSensor(quadruped, j, 1)
 
 
-
-
-
-
 def thread_job():
     rospy.spin()
+
+
+def acc_filter(value, last_accValue):
+    a = 0.01
+    filter_value = a * value + (1 - a) * last_accValue
+    return filter_value
 
 
 def set_pos(set_mode, position_list=[]):
@@ -132,14 +134,13 @@ def callback_mode(req):
         for j in range(16):
             force = 0
             p.setJointMotorControl2(quadruped, j, p.VELOCITY_CONTROL, force=force, positionGain=10, velocityGain=10)
-            #p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
+            # p.changeDynamics(quadruped, j, spinningFriction=0.01, rollingFriction=0.01, jointDamping=1.0)
             p.changeDynamics(quadruped, j, jointDamping=0.5)
     elif req.cmd == 1:
         mode = p.POSITION_CONTROL
     elif req.cmd == 4:
         mode = p.VELOCITY_CONTROL
     return QuadrupedCmdResponse(0, "get the mode")
-
 
 
 def talker():
@@ -157,6 +158,9 @@ def talker():
     joint_msg.header = Header()
     linearandangular_vel1 = get_vel()
     count = 0
+    lastvalue_X = 0.0
+    lastvalue_Y = 0.0
+    lastvalue_Z = 0.0
     while not rospy.is_shutdown():
         quaternion = []
         poseandorn = get_pose_orn()
@@ -174,14 +178,25 @@ def talker():
         acc_X = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / freq
         acc_Y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / freq
         acc_Z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / freq + 9.8
-        imu_msg.linear_acceleration.x = matrix[0] * acc_X + matrix[1] * acc_Y + matrix[2] * acc_Z
-        imu_msg.linear_acceleration.y = matrix[3] * acc_X + matrix[4] * acc_Y + matrix[5] * acc_Z
-        imu_msg.linear_acceleration.z = matrix[6] * acc_X + matrix[7] * acc_Y + matrix[8] * acc_Z
+        linear_X = matrix[0] * acc_X + matrix[1] * acc_Y + matrix[2] * acc_Z
+        linear_Y = matrix[3] * acc_X + matrix[4] * acc_Y + matrix[5] * acc_Z
+        linear_Z = matrix[6] * acc_X + matrix[7] * acc_Y + matrix[8] * acc_Z
+        if count == 0:
+            lastvalue_X = linear_X
+            lastvalue_Y = linear_Y
+            lastvalue_Z = linear_Z
+        elif count > 0:
+            lastvalue_X = acc_filter(linear_X, lastvalue_X)
+            lastvalue_Y = acc_filter(linear_Y, lastvalue_Y)
+            lastvalue_Z = acc_filter(linear_Z, lastvalue_Z)
+        imu_msg.linear_acceleration.x = lastvalue_X
+        imu_msg.linear_acceleration.y = lastvalue_Y
+        imu_msg.linear_acceleration.z = lastvalue_Z
         imu_msg.angular_velocity.x = linearandangular_vel2[1][0]
         imu_msg.angular_velocity.y = linearandangular_vel2[1][1]
         imu_msg.angular_velocity.z = linearandangular_vel2[1][2]
         linearandangular_vel1 = linearandangular_vel2
-        print(imu_msg)
+        # print(imu_msg)
 
         joint_msg.header.stamp = rospy.Time.now()
         joint_msg.name = ["abduct_fl", "thigh_fl", "knee_fl", "abduct_hl", "thigh_hl", "knee_hl",
@@ -213,7 +228,6 @@ def talker():
         # print("get the 7", myjoint_sate[13][2][2])
         # print("get the 11", myjoint_sate[14][2][2])
         # print("get the 15", myjoint_sate[15][2][2])
-        # print(myjoint_sate)
         p.stepSimulation()
         # rospy.spin()
         rate.sleep()
