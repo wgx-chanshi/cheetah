@@ -22,6 +22,10 @@ def init_simulation():
     # p.setPhysicsEngineParameter(fixedTimeStep=1.0 / 10., numSolverIterations=550, numSubSteps=4)
     p.resetDebugVisualizerCamera(0.2, 45, -30, [1, -1, 1])
     planeId = p.loadURDF("plane.urdf")
+    p.changeDynamics(bodyUniqueId = planeId, 
+                     linkIndex = -1, 
+                     contactStiffness = 500000,
+                     contactDamping = 5000)
     init_position = [0, 0, 0.5]
     quadruped = p.loadURDF("mini_cheetah/mini_cheetah.urdf", init_position, useFixedBase=False)
     num_joints = p.getNumJoints(quadruped)
@@ -56,17 +60,21 @@ def thread_job():
 
 
 def acc_filter(value, last_accValue):
-    a = 0.01
+    a = 0.0
     filter_value = a * value + (1 - a) * last_accValue
     return filter_value
 
 
 def set_pos(set_mode, position_list=[]):
     maxForces = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+    posGain = [0.01] * 12
+    #velGain = [0.1] * 12
     p.setJointMotorControlArray(quadruped,
                                 jointIndices=motor_id_list,
                                 controlMode=set_mode,
                                 targetPositions=position_list,
+                                #positionGains = posGain,
+                                #velocityGains = velGain,
                                 forces=maxForces)
 
 
@@ -102,7 +110,6 @@ def callback_state(msg):
     # global get_position=[]
     # global get_velocity=[]
     # global get_effort=[]
-    print("hello world11111111111111111111111111")
     get_position = []
     get_velocity = []
     get_effort = []
@@ -111,14 +118,14 @@ def callback_state(msg):
         for i in range(12):
             get_effort.append(compensate[i] * msg.effort[i])
         set_force(p.TORQUE_CONTROL, get_effort)
-        print(mode)
-        print(msg.effort)
+        # print(mode)
+        # print(msg.effort)
 
     if mode == p.POSITION_CONTROL:
         for i in range(12):
             get_position.append(compensate[i] * msg.position[i])
         set_pos(p.POSITION_CONTROL, get_position)
-        print(msg.position)
+        # print(msg.position)
 
     if mode == p.VELOCITY_CONTROL:
         for i in range(12):
@@ -127,7 +134,6 @@ def callback_state(msg):
 
 
 def callback_mode(req):
-    print("hello world222222222222222222222222222222")
     global mode
     if req.cmd == 0:
         mode = p.TORQUE_CONTROL
@@ -151,7 +157,7 @@ def talker():
     pub1 = rospy.Publisher('/imu_body', Imu, queue_size=10)
     pub2 = rospy.Publisher('/get_js', JointState, queue_size=10)
     # rospy.init_node('talker', anonymous=True)
-    freq = 1000
+    freq = 500
     rate = rospy.Rate(freq)  # hz
     imu_msg = Imu()
     joint_msg = JointState()
@@ -175,9 +181,9 @@ def talker():
         # imu_msg.linear_acceleration.x = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / freq
         # imu_msg.linear_acceleration.y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / freq
         # imu_msg.linear_acceleration.z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / freq + 9.8
-        acc_X = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) / freq
-        acc_Y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) / freq
-        acc_Z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) / freq + 9.8
+        acc_X = (linearandangular_vel2[0][0] - linearandangular_vel1[0][0]) * freq
+        acc_Y = (linearandangular_vel2[0][1] - linearandangular_vel1[0][1]) * freq
+        acc_Z = (linearandangular_vel2[0][2] - linearandangular_vel1[0][2]) * freq + 9.8
         linear_X = matrix[0] * acc_X + matrix[1] * acc_Y + matrix[2] * acc_Z
         linear_Y = matrix[3] * acc_X + matrix[4] * acc_Y + matrix[5] * acc_Z
         linear_Z = matrix[6] * acc_X + matrix[7] * acc_Y + matrix[8] * acc_Z
@@ -235,7 +241,6 @@ def talker():
 
 # def listener():
 #     rospy.init_node('listener', anonymous=True)
-#     print("adsssssssssssssssssssssssssss")
 #     rospy.Subscriber('/set_js', JointState, callback_state)
 #     s = rospy.Service('/set_jm', QuadrupedCmd, callback_mode)
 #     # spin() simply keeps python from exiting until this node is stopped
