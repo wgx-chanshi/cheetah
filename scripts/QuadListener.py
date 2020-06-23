@@ -157,7 +157,7 @@ def talker():
     pub1 = rospy.Publisher('/imu_body', Imu, queue_size=10)
     pub2 = rospy.Publisher('/get_js', JointState, queue_size=10)
     # rospy.init_node('talker', anonymous=True)
-    freq = 500
+    freq = 600
     rate = rospy.Rate(freq)  # hz
     imu_msg = Imu()
     joint_msg = JointState()
@@ -221,7 +221,7 @@ def talker():
                               joint_state[3][1], joint_state[4][1], joint_state[5][1],
                               -joint_state[6][1], -joint_state[7][1], -joint_state[8][1],
                               joint_state[9][1], -joint_state[10][1], -joint_state[11][1]]
-        if count % 2 == 0:
+        if count % 3 == 0:
             pub1.publish(imu_msg)
             pub2.publish(joint_msg)
         count = count + 1
